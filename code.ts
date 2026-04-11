@@ -203,7 +203,7 @@ async function main() {
 
         figma.currentPage.selection = [connectorInCopy];
         success = true;
-        figma.notify('Коннектор успешно создан');
+        figma.notify('Коннектор создан');
       }
     } finally {
       if (!success && connectorInCopy) connectorInCopy.remove();
