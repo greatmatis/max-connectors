@@ -1,50 +1,50 @@
 # Max Connectors
 
-A FigJam plugin for quickly connecting two selected objects with a styled connector.
+Плагин для FigJam, который быстро соединяет два выделенных объекта стилизованным коннектором.
 
-## What it does
+## Что делает
 
-Select any two objects and run the plugin — it instantly creates a connector between them with consistent styling. The plugin automatically determines the direction of the arrow and finds the best attachment point.
+Выделите два объекта и запустите плагин — он мгновенно создаст коннектор с нужным стилем. Плагин автоматически определяет направление стрелки и выбирает лучшую точку крепления.
 
-## Commands
+## Команды
 
-**Max Connectors > Connector** — creates a connector without a label.
+**Max Connectors > Коннектор** — создаёт коннектор без подписи.
 
-**Max Connectors > Connector with text** — creates a connector with a label. Double-click the connector to type.
+**Max Connectors > Коннектор с текстом** — создаёт коннектор с подписью. Дважды кликните на коннектор, чтобы ввести текст.
 
-Both commands are available in FigJam's Quick Actions (⌘/).
+Обе команды доступны через Quick Actions в FigJam (⌘/).
 
-## Setup
+## Настройка
 
-The plugin requires a master connector named **Master Connector** to exist somewhere on the current page. This connector acts as a style template — the plugin clones it and connects it to the selected objects.
+Плагин требует наличия мастер-коннектора с именем **Master Connector** на текущей странице. Этот коннектор служит шаблоном стилей — плагин клонирует его и подключает к выделенным объектам.
 
-1. Create a connector in FigJam and name it `Master Connector`
-2. Style it however you like (stroke color, weight, arrow caps, label formatting, etc.)
-3. Select two objects and run the plugin
+1. Создайте коннектор в FigJam и назовите его `Master Connector`
+2. Настройте его стиль как вам нужно (цвет, толщина линии, стрелки, форматирование текста и т.д.)
+3. Выделите два объекта и запустите плагин
 
-The plugin remembers the master connector's ID so subsequent runs are fast.
+Плагин запоминает ID мастер-коннектора, поэтому последующие запуски работают быстро.
 
-## Smart direction
+## Умное направление
 
-The plugin determines the direction of the arrow automatically:
+Плагин автоматически определяет направление стрелки:
 
-- If one object is a child of a frame (e.g. a button inside a screen) and the other is a top-level frame — the child is always the **start** (source), the frame is the **end** (destination). This matches the typical user flow pattern where a UI element triggers a new screen.
-- Otherwise, the leftmost object (by horizontal center) is the start. If they're aligned horizontally, the topmost is the start.
+- Если один объект является дочерним элементом фрейма (например, кнопка внутри экрана), а второй — верхнеуровневый фрейм, то дочерний объект всегда будет **стартом** (источником), а фрейм — **финишем** (назначением). Это соответствует типичному паттерну user flow, где элемент интерфейса вызывает новый экран.
+- В остальных случаях стартом становится объект, расположенный левее (по горизонтальному центру). Если объекты выровнены по горизонтали — стартом становится верхний.
 
-## Smart attachment
+## Умное крепление
 
-The connector attaches to the edge of each object that faces the other:
+Коннектор крепится к тому краю объекта, который обращён к другому объекту:
 
-- If there's enough space between the objects, the connector exits from the facing side (left/right or top/bottom).
-- If the objects are too close, the plugin falls back to a perpendicular side to avoid the connector overlapping the objects.
-- If an object is nested inside an instance or frame, the connector attaches to the nearest accessible ancestor with a position offset pointing to the original object's edge.
+- Если между объектами достаточно места, коннектор выходит с обращённой стороны (лево/право или верх/низ).
+- Если объекты расположены слишком близко, плагин переключается на перпендикулярную сторону, чтобы коннектор не перекрывал объекты.
+- Если объект вложен внутрь инстанса или фрейма, коннектор крепится к ближайшему доступному предку со смещением, указывающим на нужный край исходного объекта.
 
-## Development
+## Разработка
 
 ```bash
 npm install
-npm run build     # compile once
-npm run watch     # compile on save
+npm run build     # однократная компиляция
+npm run watch     # компиляция при сохранении
 ```
 
-Compiled output is `code.js`. Load the plugin in FigJam via Plugins > Development > Import plugin from manifest.
+Скомпилированный файл — `code.js`. Загрузите плагин в FigJam через Plugins > Development > Import plugin from manifest.
