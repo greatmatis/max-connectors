@@ -1,0 +1,21 @@
+{
+  "name": "Max Connectors",
+  "id": "1596568988120209806",
+  "api": "1.0.0",
+  "main": "code.js",
+  "capabilities": [],
+  "menu": [
+    { "name": "Коннектор", "command": "connector" },
+    { "name": "Коннектор с текстом", "command": "connector-with-text" }
+  ],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figjam"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "none"
+    ]
+  }
+}
