@@ -3,12 +3,9 @@
 const MASTER_CONNECTOR_NAME = 'Master Connector';
 const STORAGE_KEY = 'masterConnectorId';
 
-const CONNECTOR_COLOR = { r: 151 / 255, g: 72 / 255, b: 255 / 255 };
-const CONNECTOR_STROKE_WEIGHT = 3;
 const ARROW_MIN_GAP = 64; // минимальный зазор между нодами для прямого крепления
 
 async function main() {
-  await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
 
   // Проверяем, что выделено ровно 2 объекта
   const selection = figma.currentPage.selection;
@@ -151,6 +148,12 @@ async function main() {
     return;
   }
 
+  // Загружаем шрифт мастер-коннектора — он может быть любым
+  const textFont = connectorLine.text.fontName;
+  if (textFont !== figma.mixed) {
+    await figma.loadFontAsync(textFont);
+  }
+
   try {
     const absBounds = connectorLine.absoluteBoundingBox;
     if (!absBounds) {
@@ -193,9 +196,6 @@ async function main() {
         connectorInCopy.connectorLineType = 'ELBOWED';
         connectorInCopy.connectorStart = makeEndpoint(node1, node2, connectorParent);
         connectorInCopy.connectorEnd = makeEndpoint(node2, node1, connectorParent);
-
-        connectorInCopy.strokes = [{ type: 'SOLID', color: CONNECTOR_COLOR }];
-        connectorInCopy.strokeWeight = CONNECTOR_STROKE_WEIGHT;
 
         if (figma.command === 'connector') {
           connectorInCopy.text.characters = '';
