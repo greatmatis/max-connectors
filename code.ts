@@ -16,16 +16,22 @@ async function main() {
   }
 
   // Определяем направление коннектора:
-  // Приоритет: дочерняя нода (родитель — не PAGE) всегда start
+  // Приоритет: более глубоко вложенная нода — всегда start
   // Иначе: нода левее по центру x (при равенстве — выше по y) — start
-  const isChild = (node: SceneNode) => node.parent !== null && node.parent.type !== 'PAGE';
+  const getDepth = (node: SceneNode): number => {
+    let depth = 0;
+    let cur: BaseNode | null = node.parent;
+    while (cur && cur.type !== 'PAGE') { depth++; cur = cur.parent; }
+    return depth;
+  };
   const s0 = selection[0];
   const s1 = selection[1];
+  const depth0 = getDepth(s0);
+  const depth1 = getDepth(s1);
   let node1: SceneNode, node2: SceneNode;
-  if (isChild(s0) && !isChild(s1)) {
-    node1 = s0; node2 = s1;
-  } else if (isChild(s1) && !isChild(s0)) {
-    node1 = s1; node2 = s0;
+  if (depth0 !== depth1) {
+    node1 = depth0 > depth1 ? s0 : s1;
+    node2 = depth0 > depth1 ? s1 : s0;
   } else {
     const b0 = s0.absoluteBoundingBox;
     const b1 = s1.absoluteBoundingBox;
