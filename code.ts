@@ -130,7 +130,7 @@ async function main() {
     return { endpointNodeId: connectable.id, magnet: 'AUTO' };
   };
 
-  // Ищем мастер-коннектор: сначала по сохранённому id, затем по имени
+  // Ищем мастер-коннектор: сначала по сохранённому id, затем на Cover, затем на текущей странице
   let connectorLine: ConnectorNode | undefined;
   const savedId = await figma.clientStorage.getAsync(STORAGE_KEY) as string | undefined;
   if (savedId) {
@@ -140,9 +140,17 @@ async function main() {
     }
   }
   if (!connectorLine) {
-    connectorLine = figma.currentPage.findAll(
-      node => node.name === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
-    )[0] as ConnectorNode | undefined;
+    const coverPage = figma.root.children.find(p => p.name === 'Cover');
+    const searchPages = coverPage
+      ? [coverPage, figma.currentPage].filter((p, i, arr) => arr.indexOf(p) === i)
+      : [figma.currentPage];
+    for (const page of searchPages) {
+      if (page !== figma.currentPage) await figma.loadAllPagesAsync();
+      const found = page.findAll(
+        node => node.name === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
+      )[0] as ConnectorNode | undefined;
+      if (found) { connectorLine = found; break; }
+    }
     if (connectorLine) {
       await figma.clientStorage.setAsync(STORAGE_KEY, connectorLine.id);
     }
@@ -154,10 +162,21 @@ async function main() {
     return;
   }
 
-  // Загружаем шрифт мастер-коннектора — он может быть любым
+  // Загружаем все шрифты мастер-коннектора (их может быть несколько при смешанном форматировании)
   const textFont = connectorLine.text.fontName;
   if (textFont !== figma.mixed) {
     await figma.loadFontAsync(textFont);
+  } else {
+    const len = connectorLine.text.characters.length;
+    const seen = new Set<string>();
+    for (let i = 0; i < len; i++) {
+      const font = connectorLine.text.getRangeFontName(i, i + 1) as FontName;
+      const key = `${font.family}::${font.style}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        await figma.loadFontAsync(font);
+      }
+    }
   }
 
   try {
@@ -168,23 +187,32 @@ async function main() {
       return;
     }
 
-    const originalX = absBounds.x;
-    const originalY = absBounds.y;
+    // Сохраняем позицию и родителя мастер-коннектора, чтобы вернуть его на место
+    const origRelX = connectorLine.x;
+    const origRelY = connectorLine.y;
+    const originalParent = connectorLine.parent as ChildrenMixin;
 
-    // Клонируем мастер-коннектор через временный фрейм (единственный способ в Figma API)
+    // Оборачиваем мастер во временный фрейм прямо на его странице
     const frame = figma.createFrame();
     frame.name = 'Connector frame';
     frame.x = absBounds.x;
     frame.y = absBounds.y;
     frame.resize(absBounds.width, absBounds.height);
-    figma.currentPage.appendChild(frame);
+    originalParent.appendChild(frame);
 
     connectorLine.x = connectorLine.x - absBounds.x;
     connectorLine.y = connectorLine.y - absBounds.y;
     frame.appendChild(connectorLine);
 
+    // Клонируем фрейм и переносим копию на текущую страницу
     const frameCopy = frame.clone() as FrameNode;
     figma.currentPage.appendChild(frameCopy);
+
+    // Возвращаем мастер-коннектор на исходное место
+    connectorLine.x = origRelX;
+    connectorLine.y = origRelY;
+    originalParent.appendChild(connectorLine);
+    frame.remove();
 
     const connectorInCopy = frameCopy.findAll().find(
       node => node.name === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
@@ -198,6 +226,7 @@ async function main() {
         const connectorParent = getCommonParent(node1, node2);
         (connectorParent as ChildrenMixin).appendChild(connectorInCopy);
         connectorInCopy.name = 'Arrow';
+        connectorInCopy.visible = true;
 
         connectorInCopy.connectorLineType = 'ELBOWED';
         connectorInCopy.connectorStart = makeEndpoint(node1, node2, connectorParent);
@@ -213,10 +242,6 @@ async function main() {
       }
     } finally {
       if (!success && connectorInCopy) connectorInCopy.remove();
-      connectorLine.x = originalX;
-      connectorLine.y = originalY;
-      figma.currentPage.appendChild(connectorLine);
-      frame.remove();
       frameCopy.remove();
     }
   } catch (error) {
