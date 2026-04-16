@@ -140,7 +140,11 @@ async function main() {
     }
   }
   if (!connectorLine) {
-    const coverPage = figma.root.children.find(p => p.name === 'Cover');
+    const coverPage = figma.root.children.find(p =>
+      p.name === 'Cover' ||
+      p.name === 'cover' ||
+      p.name.toLowerCase().includes('обложка')
+    );
     const searchPages = coverPage
       ? [coverPage, figma.currentPage].filter((p, i, arr) => arr.indexOf(p) === i)
       : [figma.currentPage];
