@@ -16,8 +16,8 @@ async function main() {
   }
 
   // Определяем направление коннектора:
-  // Приоритет: более глубоко вложенная нода — всегда start
-  // Иначе: нода левее по центру x (при равенстве — выше по y) — start
+  // Приоритет 1: более глубоко вложенная нода — всегда start
+  // Приоритет 2: нода левее по центру x (при равенстве — выше по y) — start
   const getDepth = (node: SceneNode): number => {
     let depth = 0;
     let cur: BaseNode | null = node.parent;
@@ -227,6 +227,23 @@ async function main() {
       if (!connectorInCopy) {
         figma.notify('Коннектор не найден в копии фрейма');
       } else {
+        // Очищаем текст пока коннектор ещё внутри frameCopy (невидимого), чтобы не мигал
+        if (figma.command === 'connector') {
+          const copyFont = connectorInCopy.text.fontName;
+          if (copyFont !== figma.mixed) {
+            await figma.loadFontAsync(copyFont);
+          } else {
+            const copyLen = connectorInCopy.text.characters.length;
+            const copySeen = new Set<string>();
+            for (let i = 0; i < copyLen; i++) {
+              const font = connectorInCopy.text.getRangeFontName(i, i + 1) as FontName;
+              const key = `${font.family}::${font.style}`;
+              if (!copySeen.has(key)) { copySeen.add(key); await figma.loadFontAsync(font); }
+            }
+          }
+          connectorInCopy.text.characters = '';
+        }
+
         const connectorParent = getCommonParent(node1, node2);
         (connectorParent as ChildrenMixin).appendChild(connectorInCopy);
         connectorInCopy.name = 'Arrow';
@@ -235,10 +252,6 @@ async function main() {
         connectorInCopy.connectorLineType = 'ELBOWED';
         connectorInCopy.connectorStart = makeEndpoint(node1, node2, connectorParent);
         connectorInCopy.connectorEnd = makeEndpoint(node2, node1, connectorParent);
-
-        if (figma.command === 'connector') {
-          connectorInCopy.text.characters = '';
-        }
 
         figma.currentPage.selection = [connectorInCopy];
         success = true;
