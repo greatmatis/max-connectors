@@ -1,6 +1,6 @@
 // Плагин для соединения двух выделенных объектов коннектором
 
-const MASTER_CONNECTOR_NAME = 'Master Connector';
+const MASTER_CONNECTOR_NAME = 'master connector';
 const STORAGE_KEY = 'masterConnectorId';
 
 const ARROW_MIN_GAP = 64; // минимальный зазор между нодами для прямого крепления
@@ -135,10 +135,11 @@ async function main() {
   const savedId = await figma.clientStorage.getAsync(STORAGE_KEY) as string | undefined;
   if (savedId) {
     const node = await figma.getNodeByIdAsync(savedId);
-    if (node && node.type === 'CONNECTOR' && node.name === MASTER_CONNECTOR_NAME) {
+    if (node && node.type === 'CONNECTOR' && node.name.toLowerCase() === MASTER_CONNECTOR_NAME) {
       connectorLine = node as ConnectorNode;
     }
   }
+  let searchedPageNames: string[] = [];
   if (!connectorLine) {
     const coverPage = figma.root.children.find(p =>
       p.name === 'Cover' ||
@@ -148,10 +149,11 @@ async function main() {
     const searchPages = coverPage
       ? [coverPage, figma.currentPage].filter((p, i, arr) => arr.indexOf(p) === i)
       : [figma.currentPage];
+    searchedPageNames = searchPages.map(p => p.name);
     for (const page of searchPages) {
       if (page !== figma.currentPage) await figma.loadAllPagesAsync();
       const found = page.findAll(
-        node => node.name === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
+        node => node.name.toLowerCase() === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
       )[0] as ConnectorNode | undefined;
       if (found) { connectorLine = found; break; }
     }
@@ -161,26 +163,42 @@ async function main() {
   }
 
   if (!connectorLine) {
-    figma.notify('Master Connector не найден на странице');
+    const pageList = searchedPageNames.length > 0
+      ? searchedPageNames.join(', ')
+      : figma.currentPage.name;
+    const pageWord = searchedPageNames.length > 1 ? 'страницах' : 'странице';
+    figma.notify(`Master Connector не найден на ${pageWord} ${pageList}. Скопируйте из гайда`, {
+      button: {
+        text: 'Открыть гайд',
+        action: () => { figma.openExternal('https://www.figma.com/design/yofkCkiBiGC42KnQw7cSl6/%F0%9F%A7%B0-%D0%93%D0%B0%D0%B9%D0%B4-%D0%BF%D0%BE-%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B5-%D0%BC%D0%B0%D0%BA%D0%B5%D1%82%D0%BE%D0%B2%C2%A0%D0%B2-Figma?node-id=505-7638&t=tm5oTVlU1nzMOmMu-11'); }
+      }
+    });
+    await new Promise(r => setTimeout(r, 3000));
     figma.closePlugin();
     return;
   }
 
+  const fallbackFont: FontName = { family: 'Inter', style: 'Medium' };
+
   // Загружаем все шрифты мастер-коннектора (их может быть несколько при смешанном форматировании)
-  const textFont = connectorLine.text.fontName;
-  if (textFont !== figma.mixed) {
-    await figma.loadFontAsync(textFont);
-  } else {
-    const len = connectorLine.text.characters.length;
-    const seen = new Set<string>();
-    for (let i = 0; i < len; i++) {
-      const font = connectorLine.text.getRangeFontName(i, i + 1) as FontName;
-      const key = `${font.family}::${font.style}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        await figma.loadFontAsync(font);
+  try {
+    const textFont = connectorLine.text.fontName;
+    if (textFont !== figma.mixed) {
+      await figma.loadFontAsync(textFont);
+    } else {
+      const len = connectorLine.text.characters.length;
+      const seen = new Set<string>();
+      for (let i = 0; i < len; i++) {
+        const font = connectorLine.text.getRangeFontName(i, i + 1) as FontName;
+        const key = `${font.family}::${font.style}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          await figma.loadFontAsync(font);
+        }
       }
     }
+  } catch {
+    await figma.loadFontAsync(fallbackFont);
   }
 
   try {
@@ -219,7 +237,7 @@ async function main() {
     frame.remove();
 
     const connectorInCopy = frameCopy.findAll().find(
-      node => node.name === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
+      node => node.name.toLowerCase() === MASTER_CONNECTOR_NAME && node.type === 'CONNECTOR'
     ) as ConnectorNode | undefined;
 
     let success = false;
@@ -229,17 +247,22 @@ async function main() {
       } else {
         // Очищаем текст пока коннектор ещё внутри frameCopy (невидимого), чтобы не мигал
         if (figma.command === 'connector') {
-          const copyFont = connectorInCopy.text.fontName;
-          if (copyFont !== figma.mixed) {
-            await figma.loadFontAsync(copyFont);
-          } else {
-            const copyLen = connectorInCopy.text.characters.length;
-            const copySeen = new Set<string>();
-            for (let i = 0; i < copyLen; i++) {
-              const font = connectorInCopy.text.getRangeFontName(i, i + 1) as FontName;
-              const key = `${font.family}::${font.style}`;
-              if (!copySeen.has(key)) { copySeen.add(key); await figma.loadFontAsync(font); }
+          try {
+            const copyFont = connectorInCopy.text.fontName;
+            if (copyFont !== figma.mixed) {
+              await figma.loadFontAsync(copyFont);
+            } else {
+              const copyLen = connectorInCopy.text.characters.length;
+              const copySeen = new Set<string>();
+              for (let i = 0; i < copyLen; i++) {
+                const font = connectorInCopy.text.getRangeFontName(i, i + 1) as FontName;
+                const key = `${font.family}::${font.style}`;
+                if (!copySeen.has(key)) { copySeen.add(key); await figma.loadFontAsync(font); }
+              }
             }
+          } catch {
+            await figma.loadFontAsync(fallbackFont);
+            connectorInCopy.text.fontName = fallbackFont;
           }
           connectorInCopy.text.characters = '';
         }
