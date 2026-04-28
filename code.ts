@@ -57,10 +57,19 @@ async function main() {
     return figma.currentPage;
   };
 
-  // Поднимаемся до прямого ребёнка connectorParent — только к таким нодам можно крепить endpoint
+  // Поднимаемся до прямого ребёнка connectorParent — только к таким нодам можно крепить endpoint.
+  // Исключение: если на пути нет INSTANCE — можно крепиться напрямую к исходной ноде.
   const getConnectableNode = (node: SceneNode, connectorParent: BaseNode): SceneNode => {
+    let hasInstance = false;
+    let cur: BaseNode | null = node.parent;
+    while (cur && cur !== connectorParent) {
+      if ((cur as SceneNode).type === 'INSTANCE') { hasInstance = true; break; }
+      cur = cur.parent;
+    }
+    if (!hasInstance) return node;
+    // Поднимаемся пока родитель — INSTANCE, останавливаемся на внешнем INSTANCE-е
     let current: SceneNode = node;
-    while (current.parent && current.parent !== connectorParent) {
+    while (current.parent && (current.parent as SceneNode).type === 'INSTANCE') {
       current = current.parent as SceneNode;
     }
     return current;
