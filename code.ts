@@ -67,24 +67,73 @@ async function main() {
       cur = cur.parent;
     }
     if (!hasInstance) return node;
-    // Поднимаемся пока родитель — INSTANCE, останавливаемся на внешнем INSTANCE-е
+    // Ищем самый внешний INSTANCE в цепочке до connectorParent
+    let outermostInstance: SceneNode | undefined;
     let current: SceneNode = node;
-    while (current.parent && (current.parent as SceneNode).type === 'INSTANCE') {
+    while (current.parent && current.parent !== connectorParent) {
+      if (current.type === 'INSTANCE') outermostInstance = current;
       current = current.parent as SceneNode;
     }
-    return current;
+    if (current.type === 'INSTANCE') outermostInstance = current;
+    return outermostInstance ?? current;
   };
 
   // Зазоры между двумя прямоугольниками
   const hGap = (a: Rect, b: Rect) => Math.max(a.x, b.x) - Math.min(a.x + a.width, b.x + b.width);
   const vGap = (a: Rect, b: Rect) => Math.max(a.y, b.y) - Math.min(a.y + a.height, b.y + b.height);
 
+  // Ищем экран-контейнер: прямой ребёнок connectorParent, содержащий ноду.
+  // Если этот ребёнок — Section, берём её прямого ребёнка (сам экран-фрейм).
+  const getContainer = (node: SceneNode, connectorParent: BaseNode): SceneNode | undefined => {
+    let current: SceneNode = node;
+    let previous: SceneNode = node;
+    while (current.parent && current.parent !== connectorParent) {
+      previous = current;
+      current = current.parent as SceneNode;
+    }
+    if (current === node) return undefined;
+    if (current.type === 'SECTION') return previous !== node && previous.type === 'FRAME' ? previous : undefined;
+    if (current.type !== 'FRAME') return undefined;
+    return current;
+  };
+
   // Выбираем сторону крепления на node, смотря в сторону other.
+  // Если передан container — выбираем сторону, минимизирующую пересечение контейнера.
   // Если зазора не хватает по доминирующей оси — используем перпендикулярную.
-  const getMagnet = (node: SceneNode, other: SceneNode): 'AUTO' | 'TOP' | 'LEFT' | 'BOTTOM' | 'RIGHT' | 'CENTER' | 'NONE' => {
+  const getMagnet = (node: SceneNode, other: SceneNode, container?: SceneNode): 'AUTO' | 'TOP' | 'LEFT' | 'BOTTOM' | 'RIGHT' | 'CENTER' | 'NONE' => {
     const nb = node.absoluteBoundingBox;
     const ob = other.absoluteBoundingBox;
     if (!nb || !ob) return 'AUTO';
+
+    if (container) {
+      const cb = container.absoluteBoundingBox;
+      if (cb) {
+        const prefH: 'LEFT' | 'RIGHT' = (nb.x + nb.width / 2) >= (cb.x + cb.width / 2) ? 'RIGHT' : 'LEFT';
+        const dx = (ob.x + ob.width / 2) - (cb.x + cb.width / 2);
+        const prefHOpposed = (prefH === 'LEFT' && dx > 0) || (prefH === 'RIGHT' && dx < 0);
+        const gapH = prefH === 'LEFT'
+          ? (nb.x - cb.x)
+          : (cb.x + cb.width - nb.x - nb.width);
+        const gapTop    = nb.y - cb.y;
+        const gapBottom = cb.y + cb.height - nb.y - nb.height;
+        const gapV = Math.min(gapTop, gapBottom);
+        const prefV: 'TOP' | 'BOTTOM' = gapTop <= gapBottom ? 'TOP' : 'BOTTOM';
+        if (!prefHOpposed) {
+          if (gapH <= gapV) return prefH;
+          return prefV;
+        }
+        const gapHFar = prefH === 'LEFT'
+          ? (cb.x + cb.width - nb.x - nb.width)
+          : (nb.x - cb.x);
+        const toward: 'LEFT' | 'RIGHT' = prefH === 'LEFT' ? 'RIGHT' : 'LEFT';
+        if (gapH * 2 >= gapHFar) {
+          if (gapHFar <= gapV) return toward;
+          return prefV;
+        }
+        if (gapH < gapV) return prefH;
+        return prefV;
+      }
+    }
 
     const dx = (ob.x + ob.width / 2) - (nb.x + nb.width / 2);
     const dy = (ob.y + ob.height / 2) - (nb.y + nb.height / 2);
@@ -116,7 +165,7 @@ async function main() {
 
   const makeEndpoint = (node: SceneNode, other: SceneNode, connectorParent: BaseNode): ConnectorEndpoint => {
     const connectable = getConnectableNode(node, connectorParent);
-    const magnet = getMagnet(node, other);
+    const magnet = getMagnet(node, other, getContainer(node, connectorParent));
 
     // Если нода уже является прямым ребёнком родителя — крепимся магнитом напрямую
     if (connectable === node) {
