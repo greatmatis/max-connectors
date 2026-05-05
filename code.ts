@@ -202,7 +202,8 @@ async function main() {
     const coverPage = figma.root.children.find(p =>
       p.name === 'Cover' ||
       p.name === 'cover' ||
-      p.name.toLowerCase().includes('обложка')
+      p.name.toLowerCase().includes('обложка') ||
+      p.name.toLowerCase().includes('thumbnail')
     );
     const searchPages = coverPage
       ? [coverPage, figma.currentPage].filter((p, i, arr) => arr.indexOf(p) === i)
